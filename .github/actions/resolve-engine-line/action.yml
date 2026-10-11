@@ -1,0 +1,74 @@
+name: Resolve engine line
+description: Map a Blazium version to its engine reference and normalize the deploy channel.
+
+inputs:
+  version:
+    description: Blazium version (major.minor.patch, optional status suffix ignored)
+    required: true
+  deploy_type:
+    description: Dispatch channel (release, prerelease, nightly). Empty means nightly.
+    required: false
+    default: ""
+
+outputs:
+  external_status:
+    description: Channel stamped into the build (release, prerelease, or nightly)
+    value: ${{ steps.resolve.outputs.external_status }}
+  reference:
+    description: Engine line reference (blazium-dev or blazium_4.8)
+    value: ${{ steps.resolve.outputs.reference }}
+  godot:
+    description: Godot line (4.3 or 4.8)
+    value: ${{ steps.resolve.outputs.godot }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve channel and engine line
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION="${{ inputs.version }}"
+        TYPE="${{ inputs.deploy_type }}"
+
+        case "$TYPE" in
+          release) STATUS="release" ;;
+          prerelease) STATUS="prerelease" ;;
+          nightly|"") STATUS="nightly" ;;
+          *)
+            echo "Error: unsupported deploy type '$TYPE' (expected release, prerelease, or nightly)." >&2
+            exit 1
+            ;;
+        esac
+
+        IFS='.' read -r MAJOR MINOR _REST <<< "$VERSION"
+        if [ "${MAJOR:-}" != "0" ] || [ -z "${MINOR:-}" ]; then
+          echo "Error: version '$VERSION' is not a Blazium 0.x version." >&2
+          exit 1
+        fi
+
+        case "$MINOR" in
+          6|7)
+            REF="blazium-dev"
+            GODOT="4.3"
+            ;;
+          8|9)
+            REF="blazium_4.8"
+            GODOT="4.8"
+            ;;
+          *)
+            echo "Error: version '$VERSION' is not a known engine line (0.6/0.7 are 4.3 blazium-dev, 0.8/0.9 are 4.8 blazium_4.8)." >&2
+            exit 1
+            ;;
+        esac
+
+        echo "external_status=$STATUS" >> "$GITHUB_OUTPUT"
+        echo "reference=$REF" >> "$GITHUB_OUTPUT"
+        echo "godot=$GODOT" >> "$GITHUB_OUTPUT"
+
+        echo "### Engine line" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Version**: $VERSION" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Channel**: $STATUS" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Reference**: $REF" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Godot**: $GODOT" >> "$GITHUB_STEP_SUMMARY"

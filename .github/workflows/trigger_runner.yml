@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
       type:
-        description: 'Prod or nightly (e.g., nightly)'
+        description: 'Deploy channel: release, prerelease, or nightly. A release build must set this to release; production=true does not change the version label.'
         required: true
         default: 'nightly'
       branch:

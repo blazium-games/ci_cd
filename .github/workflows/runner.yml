@@ -7,7 +7,7 @@ env:
   GODOT_BASE_BRANCH: blazium-dev
 
 concurrency:
-  group: ci-${{ github.actor }}-${{ github.event.client_payload.type || 'nightly' }}-runner
+  group: ci-${{ github.actor }}-${{ github.event.client_payload.branch || 'blazium-dev' }}-${{ github.event.client_payload.type || 'nightly' }}-runner
   cancel-in-progress: true
 
 jobs:
@@ -19,8 +19,10 @@ jobs:
       external_major: ${{ steps.version.outputs.external_major }}
       external_minor: ${{ steps.version.outputs.external_minor }}
       external_patch: ${{ steps.version.outputs.external_patch }}
-      external_status: ${{ steps.version.outputs.external_status }}
       external_sha: ${{ steps.version.outputs.external_sha }}
+      external_status: ${{ steps.line.outputs.external_status }}
+      engine_reference: ${{ steps.line.outputs.reference }}
+      godot_line: ${{ steps.line.outputs.godot }}
       major: ${{ steps.new_version.outputs.major }}
       minor: ${{ steps.new_version.outputs.minor }}
       patch: ${{ steps.new_version.outputs.patch }}
@@ -50,13 +52,31 @@ jobs:
         with:
           file_path: version.py
 
+      - name: Resolve deploy channel
+        id: channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          TYPE="${{ github.event.client_payload.type }}"
+          case "$TYPE" in
+            release) STATUS="release" ;;
+            prerelease) STATUS="prerelease" ;;
+            nightly|"") STATUS="nightly" ;;
+            *)
+              echo "Error: unsupported deploy type '$TYPE' (expected release, prerelease, or nightly)." >&2
+              exit 1
+              ;;
+          esac
+          echo "external_status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "Deploy channel: $STATUS" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Freeze version if this SHA already has completed assets
         id: freeze
         env:
           CEREBRO_URL: ${{ secrets.CEREBRO_URL }}
           CEREBRO_AUTH: ${{ secrets.BLAZIUM_AUTH }}
           BUILD_SHA: ${{ steps.get_sha.outputs.sha }}
-          DEPLOY_TYPE: ${{ github.event.client_payload.type || 'nightly' }}
+          DEPLOY_TYPE: ${{ steps.channel.outputs.external_status }}
           FALLBACK_MAJOR: ${{ steps.version.outputs.external_major }}
           FALLBACK_MINOR: ${{ steps.version.outputs.external_minor }}
           FALLBACK_PATCH: ${{ steps.version.outputs.external_patch }}
@@ -102,7 +122,7 @@ jobs:
           MAJOR_VERSION: ${{ steps.freeze.outputs.major }}
           MINOR_VERSION: ${{ steps.freeze.outputs.minor }}
           PATCH_VERSION: ${{ steps.freeze.outputs.patch }}
-          BUILD_TYPE: ${{ github.event.client_payload.type || 'nightly' }}
+          BUILD_TYPE: ${{ steps.channel.outputs.external_status }}
           FREEZE_VERSION: ${{ steps.freeze.outputs.freeze }}
         run: |
           node ./cicd/scripts/changelog.js $(pwd)
@@ -112,6 +132,13 @@ jobs:
         uses: ./.github/actions/version-from-changelog
         with:
           file_path: ${{ github.workspace }}/changelog.json
+
+      - name: Resolve engine line
+        id: line
+        uses: ./.github/actions/resolve-engine-line
+        with:
+          version: ${{ steps.new_version.outputs.version_string }}
+          deploy_type: ${{ steps.channel.outputs.external_status }}
 
 
   static-checks:
@@ -136,6 +163,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
   monoglue-build:
     name: Mono Glue
@@ -167,6 +197,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
   android-build:
     name: 🤖 Android
@@ -187,6 +220,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
   ios-build:
     name: 🍏 iOS
@@ -207,6 +243,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
   linux-build:
     name: 🐧 Linux
@@ -227,6 +266,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
   macos-build:
     name: 🍎 macOS
@@ -247,6 +289,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
   windows-build:
     name: 🏁 Windows
@@ -267,6 +312,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
   deploy:
     name: Deploy
@@ -293,6 +341,9 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}
 
 
   cleanup:
@@ -314,3 +365,6 @@ jobs:
       new_minor: ${{ needs.get-latest-sha.outputs.minor }}
       new_patch: ${{ needs.get-latest-sha.outputs.patch }}
       new_version: ${{ needs.get-latest-sha.outputs.version_string }}
+      external_status: ${{ needs.get-latest-sha.outputs.external_status }}
+      engine_reference: ${{ needs.get-latest-sha.outputs.engine_reference }}
+      godot_line: ${{ needs.get-latest-sha.outputs.godot_line }}

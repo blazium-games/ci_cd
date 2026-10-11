@@ -27,17 +27,31 @@ on:
         required: true
         type: string
 
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
+
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
+  BLAZIUM_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
   EDITOR_BUILD_ID: ${{ inputs.build_sha }}
   SCONSFLAGS: verbose=yes warnings=no progress=no
   DEPLOY_TYPE: macos
   DEBUG_SCONSFLAGS: debug_symbols=yes separate_debug_symbols=yes debug_paths_relative=yes
 
 concurrency:
-  group: ci-${{github.actor}}-${{ github.event.client_payload.type || 'nightly' }}-macos
+  group: ci-${{github.actor}}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-macos
   cancel-in-progress: true
 
 jobs:
@@ -63,7 +77,8 @@ jobs:
         uses: ./.github/actions/version-checker
         with:
           deploy_type: ${{ env.DEPLOY_TYPE }}
-          build_type: ${{ github.event.client_payload.type || 'nightly' }}
+          build_type: ${{ inputs.external_status }}
+          engine_reference: ${{ inputs.engine_reference }}
           build_sha: ${{ inputs.build_sha }}
 
   template-check:
@@ -87,7 +102,8 @@ jobs:
         uses: ./.github/actions/version-checker
         with:
           deploy_type: ${{ env.DEPLOY_TYPE }}
-          build_type: ${{ github.event.client_payload.type || 'nightly' }}
+          build_type: ${{ inputs.external_status }}
+          engine_reference: ${{ inputs.engine_reference }}
           build_sha: ${{ inputs.build_sha }}
           is_template: 'true'
 
@@ -126,10 +142,10 @@ jobs:
         id: reuse
         uses: ./.github/actions/cerebro-reuse-assets
         with:
-          names: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          names: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           version: ${{ inputs.new_version }}
           build_sha: ${{ inputs.build_sha }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -209,20 +225,20 @@ jobs:
           external_major: ${{ inputs.new_major }}
           external_minor: ${{ inputs.new_minor }}
           external_patch: ${{ inputs.new_patch }}
-          external_status: ${{ github.event.client_payload.type || 'nightly' }}
+          external_status: ${{ inputs.external_status }}
           external_sha: ${{ inputs.build_sha }}
 
       - name: Notify Cerebro of Build Starting
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/cerebro-started
         with:
-          name: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
           build_type: Editor
           mono: ${{ matrix.mono }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
           branch: ${{ github.event.client_payload.branch }}
           build_os: macos
           arch: universal
@@ -244,8 +260,9 @@ jobs:
       - name: Download and extract mono-glue
         if: ${{ steps.reuse.outputs.should_compile != 'false' && (matrix.mono) }}
         run: |
-          TYPE=${{ github.event.client_payload.type || 'nightly' }}
-          URL="https://cdn.blazium.app/monoglue/${TYPE}/monoglue-${TYPE}.tar.gz"
+          TYPE=${{ inputs.external_status }}
+          REF=${{ inputs.engine_reference }}
+          URL="https://cdn.blazium.app/monoglue/${REF}/${TYPE}/monoglue-${TYPE}.tar.gz"
           
           # Download the file
           curl -L $URL -o monoglue.tar.gz
@@ -388,7 +405,7 @@ jobs:
       - name: Create tar.gz Archive
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
         run: |
-          tar -czvf ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz ./Blazium_macos.universal.zip
+          tar -czvf ${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz ./Blazium_macos.universal.zip
 
       - uses: BetaHuhn/do-spaces-action@v2
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -397,8 +414,8 @@ jobs:
           secret_key: ${{ secrets.DO_SECRET_KEY }}
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
-          source: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
-          out_dir: ${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}
+          source: ${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz
+          out_dir: ${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}
 
 
       - name: Notify Cerebro of Build Success
@@ -406,10 +423,10 @@ jobs:
         if: ${{ success() && steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/cerebro-completed
         with:
-          name: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
-          file_url: ${{ secrets.CDN_URL }}/${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}/${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
-          artifact_path: ${{ github.workspace }}/${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
+          file_url: ${{ secrets.CDN_URL }}/${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}/${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz
+          artifact_path: ${{ github.workspace }}/${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz
           version: ${{ inputs.new_version }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -418,7 +435,7 @@ jobs:
         if: ${{ steps.reuse.outputs.should_compile != 'false' && ((failure() || cancelled()) && steps.cerebro-notify-completed.outcome != 'failure') }}
         uses: ./.github/actions/cerebro-failed
         with:
-          name: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -440,7 +457,7 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: build.sha
-          out_dir: ${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}
+          out_dir: ${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}
 
   build-templates:
     runs-on: macos-15
@@ -476,10 +493,10 @@ jobs:
         id: reuse
         uses: ./.github/actions/cerebro-reuse-assets
         with:
-          names: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          names: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           version: ${{ inputs.new_version }}
           build_sha: ${{ inputs.build_sha }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -525,20 +542,20 @@ jobs:
           external_major: ${{ inputs.new_major }}
           external_minor: ${{ inputs.new_minor }}
           external_patch: ${{ inputs.new_patch }}
-          external_status: ${{ github.event.client_payload.type || 'nightly' }}
+          external_status: ${{ inputs.external_status }}
           external_sha: ${{ inputs.build_sha }}
 
       - name: Notify Cerebro of Build Starting
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/cerebro-started
         with:
-          name: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
           build_type: Template
           mono: ${{ matrix.mono }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
           branch: ${{ github.event.client_payload.branch }}
           build_os: macos
           arch: universal
@@ -561,8 +578,9 @@ jobs:
       - name: Download and extract mono-glue
         if: ${{ steps.reuse.outputs.should_compile != 'false' && (matrix.mono) }}
         run: |
-          TYPE=${{ github.event.client_payload.type || 'nightly' }}
-          URL="https://cdn.blazium.app/monoglue/${TYPE}/monoglue-${TYPE}.tar.gz"
+          TYPE=${{ inputs.external_status }}
+          REF=${{ inputs.engine_reference }}
+          URL="https://cdn.blazium.app/monoglue/${REF}/${TYPE}/monoglue-${TYPE}.tar.gz"
           
           # Download the file
           curl -L $URL -o monoglue.tar.gz
@@ -679,7 +697,7 @@ jobs:
           chmod +x macos_template.app/Contents/MacOS/blazium*
 
           # Package the application into a zip file
-          bash "${GITHUB_WORKSPACE}/.github/scripts/create_zip.sh" "${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.zip" macos_template.app
+          bash "${GITHUB_WORKSPACE}/.github/scripts/create_zip.sh" "${{ matrix.cache-name }}-${{ inputs.external_status }}.zip" macos_template.app
           
       
       - name: Create tar.gz Archive
@@ -692,7 +710,7 @@ jobs:
             MONO_SUFFIX="_mono"
           fi
 
-          tar -czvf ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz ./${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.zip
+          tar -czvf ${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz ./${{ matrix.cache-name }}-${{ inputs.external_status }}.zip
 
       - uses: BetaHuhn/do-spaces-action@v2
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -701,18 +719,18 @@ jobs:
           secret_key: ${{ secrets.DO_SECRET_KEY }}
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
-          source: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
-          out_dir: ${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}
+          source: ${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz
+          out_dir: ${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}
 
       - name: Notify Cerebro of Build Success
         id: cerebro-notify-completed
         if: ${{ success() && steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/cerebro-completed
         with:
-          name: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
-          file_url: ${{ secrets.CDN_URL }}/${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}/${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
-          artifact_path: ${{ github.workspace }}/${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
+          file_url: ${{ secrets.CDN_URL }}/${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}${{ startsWith(matrix.target, 'template_') && '/template' || '' }}/${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz
+          artifact_path: ${{ github.workspace }}/${{ matrix.cache-name }}-${{ inputs.external_status }}.tar.gz
           version: ${{ inputs.new_version }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -721,7 +739,7 @@ jobs:
         if: ${{ steps.reuse.outputs.should_compile != 'false' && ((failure() || cancelled()) && steps.cerebro-notify-completed.outcome != 'failure') }}
         uses: ./.github/actions/cerebro-failed
         with:
-          name: ${{ matrix.cache-name }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ matrix.cache-name }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -743,5 +761,5 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: build.sha
-          out_dir: ${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}/template
+          out_dir: ${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}/template
 

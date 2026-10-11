@@ -18,6 +18,19 @@ on:
         description: "New Version that'll be Deployed"
         required: true
         type: string
+
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
       monoglue-build:
         description: "Build Status for Monoglue"
         required: true
@@ -55,11 +68,11 @@ on:
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
   BASE_NAME: Blazium_v${{ inputs.new_version }}
 
 concurrency:
-  group: ci-${{github.actor}}-${{ github.event.client_payload.type || 'nightly' }}-template-deploy
+  group: ci-${{github.actor}}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-template-deploy
   cancel-in-progress: true
 
 jobs:
@@ -181,7 +194,7 @@ jobs:
         id: artifacts
         uses: ./.github/actions/resolve-template-artifacts
         with:
-          suffix: ${{ github.event.client_payload.type || 'nightly' }}
+          suffix: ${{ inputs.external_status }}
           linux: ${{ steps.platforms.outputs.linux }}
           macos: ${{ steps.platforms.outputs.macos }}
           windows: ${{ steps.platforms.outputs.windows }}
@@ -215,7 +228,7 @@ jobs:
           folder: ${{ github.workspace }}/downloads
           version: ${{ inputs.new_version }}
           build_sha: ${{ inputs.build_sha }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
 
       - name: Uncompress Templates
         uses: ./.github/actions/multi-uncompress-tar-gz
@@ -378,7 +391,7 @@ jobs:
           fi
 
           # Write the new version to the file
-          echo "${{ inputs.new_version }}.${{ github.event.client_payload.type || 'nightly' }}" > "$TARGET_FILE"
+          echo "${{ inputs.new_version }}.${{ inputs.external_status }}" > "$TARGET_FILE"
 
           # Log the action
           echo "New version written to $TARGET_FILE:" >> $GITHUB_STEP_SUMMARY
@@ -398,7 +411,7 @@ jobs:
           fi
 
           # Write the new version to the file
-          echo "${{ inputs.new_version }}.${{ github.event.client_payload.type || 'nightly' }}.mono" > "$TARGET_FILE"
+          echo "${{ inputs.new_version }}.${{ inputs.external_status }}.mono" > "$TARGET_FILE"
 
           # Log the action
           echo "New version written to $TARGET_FILE:" >> $GITHUB_STEP_SUMMARY
@@ -470,8 +483,12 @@ jobs:
       - name: Generate per-file template_files.json
         shell: bash
         env:
-          VERSION_FULL: ${{ inputs.new_version }}.${{ github.event.client_payload.type || 'nightly' }}
-          URL_BASE: ${{ secrets.CDN_URL }}/${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          VERSION_FULL: ${{ inputs.new_version }}.${{ inputs.external_status }}
+          URL_BASE: ${{ secrets.CDN_URL }}/${{ inputs.external_status }}/${{ inputs.new_version }}
+          ENGINE_REFERENCE: ${{ inputs.engine_reference }}
+          GODOT_LINE: ${{ inputs.godot_line }}
+          CHANNEL: ${{ inputs.external_status }}
+          VERSION: ${{ inputs.new_version }}
         run: |
           CDN_DIR="${GITHUB_WORKSPACE}/templates_cdn"
           # Per-file Cerebro manifest — must not overwrite Godot bundle templates.json
@@ -529,6 +546,8 @@ jobs:
               --arg arch "$ARCH" \
               --arg version "$VERSION_FULL" \
               --argjson mono "$MONO" \
+              --arg reference "$ENGINE_REFERENCE" \
+              --arg godot "$GODOT_LINE" \
               '. + [{
                 "filename": $name,
                 "download_url": $url,
@@ -537,12 +556,21 @@ jobs:
                 "platform": $platform,
                 "arch": $arch,
                 "mono": $mono,
-                "version": $version
+                "version": $version,
+                "reference": $reference,
+                "godot": $godot
               }]'
             )
           done
 
           echo "$JSON_ARRAY" > "$OUTPUT_FILE"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg channel "$CHANNEL" \
+            --arg reference "$ENGINE_REFERENCE" \
+            --arg godot "$GODOT_LINE" \
+            '{version: $version, channel: $channel, reference: $reference, godot: $godot}' \
+            > "${CDN_DIR}/line.json"
           echo "Generated per-file template_files.json" >> $GITHUB_STEP_SUMMARY
           cat "$OUTPUT_FILE" >> $GITHUB_STEP_SUMMARY
 
@@ -553,7 +581,7 @@ jobs:
           REGION: ${{ secrets.DO_SPACE_REGION }}
           KEY: ${{ secrets.DO_ACCESS_KEY }}
           SECRET: ${{ secrets.DO_SECRET_KEY }}
-          SPACE_PATH: /${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}/
+          SPACE_PATH: /${{ inputs.external_status }}/${{ inputs.new_version }}/
         run: |
           CDN_DIR="${GITHUB_WORKSPACE}/templates_cdn"
           putS3() {
@@ -589,7 +617,7 @@ jobs:
           CEREBRO_URL: ${{ secrets.CEREBRO_URL }}
           CEREBRO_AUTH: ${{ secrets.BLAZIUM_AUTH }}
           RUN_ID: ${{ inputs.runner_id }}
-          DEPLOY_TYPE: ${{ github.event.client_payload.type || 'nightly' }}
+          DEPLOY_TYPE: ${{ inputs.external_status }}
           VERSION: ${{ inputs.new_version }}
           BRANCH: ${{ github.event.client_payload.branch }}
           PRODUCTION: ${{ github.event.client_payload.production }}
@@ -738,7 +766,7 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: export/${{ env.BASE_NAME }}_export_templates.tpz
-          out_dir: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          out_dir: ${{ inputs.external_status }}/${{ inputs.new_version }}
 
       - uses: BetaHuhn/do-spaces-action@v2
         with:
@@ -747,13 +775,13 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: export/${{ env.BASE_NAME }}_mono_export_templates.tpz
-          out_dir: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          out_dir: ${{ inputs.external_status }}/${{ inputs.new_version }}
 
       - name: Generate bundle details.json with File Info and Checksums
         shell: bash
         env:
           BASE_NAME: ${{ env.BASE_NAME }}
-          URL_BASE: ${{ secrets.CDN_URL }}/${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          URL_BASE: ${{ secrets.CDN_URL }}/${{ inputs.external_status }}/${{ inputs.new_version }}
           UPLOADED_FILES: ${{ steps.template-upload.outputs.uploaded_files }}
         run: |
           # Define file paths and output file
@@ -879,7 +907,7 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: export/checksum.txt
-          out_dir: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          out_dir: ${{ inputs.external_status }}/${{ inputs.new_version }}
 
       - uses: BetaHuhn/do-spaces-action@v2
         with:
@@ -888,7 +916,7 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: export/details.json
-          out_dir: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          out_dir: ${{ inputs.external_status }}/${{ inputs.new_version }}
 
       - uses: BetaHuhn/do-spaces-action@v2
         with:
@@ -897,4 +925,4 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: export/templates.json
-          out_dir: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          out_dir: ${{ inputs.external_status }}/${{ inputs.new_version }}

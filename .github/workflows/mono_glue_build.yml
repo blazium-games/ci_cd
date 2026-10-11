@@ -27,10 +27,24 @@ on:
         required: true
         type: string
 
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
+
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
+  BLAZIUM_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
   EDITOR_BUILD_ID: ${{ inputs.build_sha }}
   SCONSFLAGS: verbose=yes warnings=no progress=no use_static_cpp=no
   DOTNET_NOLOGO: true
@@ -41,7 +55,7 @@ env:
   DEPLOY_TYPE: monoglue
 
 concurrency:
-  group: ci-${{github.actor}}-${{ github.event.client_payload.type || 'nightly' }}-monoglue
+  group: ci-${{github.actor}}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-monoglue
   cancel-in-progress: true
 
 jobs:
@@ -66,7 +80,8 @@ jobs:
         uses: ./.github/actions/version-checker
         with:
           deploy_type: ${{ env.DEPLOY_TYPE }}
-          build_type: ${{ github.event.client_payload.type || 'nightly' }}
+          build_type: ${{ inputs.external_status }}
+          engine_reference: ${{ inputs.engine_reference }}
           build_sha: ${{ inputs.build_sha }}
 
   build-monoglue:
@@ -86,10 +101,10 @@ jobs:
         id: reuse
         uses: ./.github/actions/cerebro-reuse-assets
         with:
-          names: monoglue-${{ github.event.client_payload.type || 'nightly' }}
+          names: monoglue-${{ inputs.external_status }}
           version: ${{ inputs.new_version }}
           build_sha: ${{ inputs.build_sha }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -123,7 +138,7 @@ jobs:
           external_major: ${{ inputs.new_major }}
           external_minor: ${{ inputs.new_minor }}
           external_patch: ${{ inputs.new_patch }}
-          external_status: ${{ github.event.client_payload.type || 'nightly' }}
+          external_status: ${{ inputs.external_status }}
           external_sha: ${{ inputs.build_sha }}
 
 
@@ -154,7 +169,7 @@ jobs:
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/godot-cache-restore
         with:
-          cache-name: ${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}
+          cache-name: ${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}
         continue-on-error: true
 
       - name: Setup Python and SCons
@@ -169,13 +184,13 @@ jobs:
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/cerebro-started
         with:
-          name: ${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
           build_type: Editor
           mono: true
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
           branch: ${{ github.event.client_payload.branch }}
           build_os: linux
           arch: x86_64
@@ -196,7 +211,7 @@ jobs:
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/godot-cache-save
         with:
-          cache-name: ${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}
+          cache-name: ${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}
         continue-on-error: true
 
       - name: Generate C# glue
@@ -233,7 +248,7 @@ jobs:
           ls -la ./modules/mono/glue/GodotSharp/GodotSharpEditor/
           ls -la combined/GodotSharpEditor/
           cd combined
-          tar -czvf ../${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz .
+          tar -czvf ../${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}.tar.gz .
           cd ..
 
 
@@ -244,8 +259,8 @@ jobs:
           secret_key: ${{ secrets.DO_SECRET_KEY }}
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
-          source: ${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
-          out_dir: ${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}
+          source: ${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}.tar.gz
+          out_dir: ${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}
 
       - name: Push to NuGet
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -272,17 +287,17 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: build.sha
-          out_dir: ${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}
+          out_dir: ${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}
 
       - name: Notify Cerebro of Build Success
         id: cerebro-notify-completed
         if: ${{ success() && steps.reuse.outputs.should_compile != 'false' }}
         uses: ./.github/actions/cerebro-completed
         with:
-          name: ${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
-          file_url: ${{ secrets.CDN_URL }}/${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}/${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
-          artifact_path: ${{ github.workspace }}/${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz
+          file_url: ${{ secrets.CDN_URL }}/${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}/${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}.tar.gz
+          artifact_path: ${{ github.workspace }}/${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}.tar.gz
           version: ${{ inputs.new_version }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
@@ -291,7 +306,7 @@ jobs:
         if: ${{ steps.reuse.outputs.should_compile != 'false' && ((failure() || cancelled()) && steps.cerebro-notify-completed.outcome != 'failure') }}
         uses: ./.github/actions/cerebro-failed
         with:
-          name: ${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}
+          name: ${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}

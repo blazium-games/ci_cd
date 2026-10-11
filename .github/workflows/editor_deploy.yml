@@ -18,6 +18,19 @@ on:
         description: "New Version that'll be Deployed"
         required: true
         type: string
+
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
       monoglue-build:
         description: "Build Status for Monoglue"
         required: true
@@ -51,11 +64,11 @@ on:
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
   BASE_NAME: BlaziumEditor_v${{ inputs.new_version }}
 
 concurrency:
-  group: ci-${{github.actor}}-${{ github.event.client_payload.type || 'nightly' }}-editor-deploy
+  group: ci-${{github.actor}}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-editor-deploy
   cancel-in-progress: true
 
 jobs:
@@ -174,7 +187,7 @@ jobs:
         id: artifacts
         uses: ./.github/actions/resolve-editor-artifacts
         with:
-          suffix: ${{ github.event.client_payload.type || 'nightly' }}
+          suffix: ${{ inputs.external_status }}
           base_name: ${{ env.BASE_NAME }}
           editors_dir: ${{ github.workspace }}/editors
           linux: ${{ steps.platforms.outputs.linux }}
@@ -219,7 +232,7 @@ jobs:
           run_id: ${{ inputs.runner_id }}
           version: ${{ inputs.new_version }}
           build_sha: ${{ inputs.build_sha }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
 
       - name: Uncompress Editors
         uses: ./.github/actions/multi-uncompress-tar-gz
@@ -256,7 +269,7 @@ jobs:
         run: |
           set -euo pipefail
           INPUT_DIR="${GITHUB_WORKSPACE}/extracted"
-          SUFFIX="${{ github.event.client_payload.type || 'nightly' }}"
+          SUFFIX="${{ inputs.external_status }}"
           for base in \
             windows-editor-mono-64bit \
             windows-editor-64bit \
@@ -282,8 +295,8 @@ jobs:
           password: ${{ secrets.ES_PASSWORD }}
           credential_id: ${{ secrets.CREDENTIAL_ID }}
           totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          dir_path: ${{ github.workspace }}/extracted/windows-editor-mono-64bit-${{ github.event.client_payload.type || 'nightly' }}
-          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-mono-64bit-${{ github.event.client_payload.type || 'nightly' }}
+          dir_path: ${{ github.workspace }}/extracted/windows-editor-mono-64bit-${{ inputs.external_status }}
+          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-mono-64bit-${{ inputs.external_status }}
           environment_name: PROD
 
       - name: Sign windows-editor-64bit
@@ -295,8 +308,8 @@ jobs:
           password: ${{ secrets.ES_PASSWORD }}
           credential_id: ${{ secrets.CREDENTIAL_ID }}
           totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          dir_path: ${{ github.workspace }}/extracted/windows-editor-64bit-${{ github.event.client_payload.type || 'nightly' }}
-          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-64bit-${{ github.event.client_payload.type || 'nightly' }}
+          dir_path: ${{ github.workspace }}/extracted/windows-editor-64bit-${{ inputs.external_status }}
+          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-64bit-${{ inputs.external_status }}
           environment_name: PROD
 
       - name: Sign windows-editor-mono-32bit
@@ -308,8 +321,8 @@ jobs:
           password: ${{ secrets.ES_PASSWORD }}
           credential_id: ${{ secrets.CREDENTIAL_ID }}
           totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          dir_path: ${{ github.workspace }}/extracted/windows-editor-mono-32bit-${{ github.event.client_payload.type || 'nightly' }}
-          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-mono-32bit-${{ github.event.client_payload.type || 'nightly' }}
+          dir_path: ${{ github.workspace }}/extracted/windows-editor-mono-32bit-${{ inputs.external_status }}
+          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-mono-32bit-${{ inputs.external_status }}
           environment_name: PROD
 
       - name: Sign windows-editor-32bit
@@ -321,8 +334,8 @@ jobs:
           password: ${{ secrets.ES_PASSWORD }}
           credential_id: ${{ secrets.CREDENTIAL_ID }}
           totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          dir_path: ${{ github.workspace }}/extracted/windows-editor-32bit-${{ github.event.client_payload.type || 'nightly' }}
-          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-32bit-${{ github.event.client_payload.type || 'nightly' }}
+          dir_path: ${{ github.workspace }}/extracted/windows-editor-32bit-${{ inputs.external_status }}
+          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-32bit-${{ inputs.external_status }}
           environment_name: PROD
 
       - name: Sign windows-editor-arm64
@@ -334,8 +347,8 @@ jobs:
           password: ${{ secrets.ES_PASSWORD }}
           credential_id: ${{ secrets.CREDENTIAL_ID }}
           totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          dir_path: ${{ github.workspace }}/extracted/windows-editor-arm64-${{ github.event.client_payload.type || 'nightly' }}
-          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-arm64-${{ github.event.client_payload.type || 'nightly' }}
+          dir_path: ${{ github.workspace }}/extracted/windows-editor-arm64-${{ inputs.external_status }}
+          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-arm64-${{ inputs.external_status }}
           environment_name: PROD
 
       - name: Sign windows-editor-mono-arm64
@@ -347,8 +360,8 @@ jobs:
           password: ${{ secrets.ES_PASSWORD }}
           credential_id: ${{ secrets.CREDENTIAL_ID }}
           totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          dir_path: ${{ github.workspace }}/extracted/windows-editor-mono-arm64-${{ github.event.client_payload.type || 'nightly' }}
-          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-mono-arm64-${{ github.event.client_payload.type || 'nightly' }}
+          dir_path: ${{ github.workspace }}/extracted/windows-editor-mono-arm64-${{ inputs.external_status }}
+          output_path: ${{ github.workspace }}/extracted/.__sign_out/windows-editor-mono-arm64-${{ inputs.external_status }}
           environment_name: PROD
 
       - name: Move signed Windows outputs into editor folders
@@ -357,7 +370,7 @@ jobs:
         run: |
           set -euo pipefail
           INPUT_DIR="${GITHUB_WORKSPACE}/extracted"
-          SUFFIX="${{ github.event.client_payload.type || 'nightly' }}"
+          SUFFIX="${{ inputs.external_status }}"
           for base in \
             windows-editor-mono-64bit \
             windows-editor-64bit \
@@ -398,8 +411,12 @@ jobs:
         shell: bash
         env:
           BASE_NAME: ${{ env.BASE_NAME }}
-          URL_BASE: ${{ secrets.CDN_URL }}/${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          URL_BASE: ${{ secrets.CDN_URL }}/${{ inputs.external_status }}/${{ inputs.new_version }}
           ZIP_FILES: ${{ steps.artifacts.outputs.zip_files }}
+          ENGINE_REFERENCE: ${{ inputs.engine_reference }}
+          GODOT_LINE: ${{ inputs.godot_line }}
+          CHANNEL: ${{ inputs.external_status }}
+          VERSION: ${{ inputs.new_version }}
         run: |
           # Define the editors directory and output file
           EDITORS_DIR="${GITHUB_WORKSPACE}/editors"
@@ -435,13 +452,17 @@ jobs:
                 --arg size "$FILE_SIZE" \
                 --arg url "${URL_BASE}/$FILE_NAME" \
                 --arg timestamp "$FILE_TIMESTAMP" \
+                --arg reference "$ENGINE_REFERENCE" \
+                --arg godot "$GODOT_LINE" \
                 '. + [{
                   "filename": $name,
                   "download_url": $url,
                   "sha512": $sha512,
                   "sha256": $sha256,
                   "size": ($size | tonumber),
-                  "timestamp": $timestamp
+                  "timestamp": $timestamp,
+                  "reference": $reference,
+                  "godot": $godot
                 }]'
               )
             else
@@ -451,6 +472,13 @@ jobs:
 
           # Save JSON array to file
           echo "$JSON_ARRAY" > "$OUTPUT_FILE"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg channel "$CHANNEL" \
+            --arg reference "$ENGINE_REFERENCE" \
+            --arg godot "$GODOT_LINE" \
+            '{version: $version, channel: $channel, reference: $reference, godot: $godot}' \
+            > "${EDITORS_DIR}/line.json"
 
           # Log the generated JSON
           echo "Generated JSON file: $OUTPUT_FILE" >> $GITHUB_STEP_SUMMARY
@@ -465,7 +493,7 @@ jobs:
           space_region: ${{ secrets.DO_SPACE_REGION }}
           access_key: ${{ secrets.DO_ACCESS_KEY }}
           secret_key: ${{ secrets.DO_SECRET_KEY }}
-          space_path: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          space_path: ${{ inputs.external_status }}/${{ inputs.new_version }}
 
       - uses: ./.github/actions/multi-itch.io-upload
         if: steps.platforms.outputs.linux == 'true' || steps.platforms.outputs.windows == 'true' || steps.platforms.outputs.macos == 'true'
@@ -475,7 +503,7 @@ jobs:
           itch_username: blaziumengine
           itch_game: blazium-engine
           version: ${{ inputs.new_version }}
-          tag: ${{ github.event.client_payload.type || 'nightly' }}
+          tag: ${{ inputs.external_status }}
           butler_credentials: ${{ secrets.BUTLER_CREDENTIALS }}
 
       - name: Upload assets to GitHub release

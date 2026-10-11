@@ -50,14 +50,27 @@ on:
         description: "New Version that'll be Deployed"
         required: true
         type: string
+
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
         
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
 
 concurrency:
-  group: ci-${{github.actor}}-${{ github.event.client_payload.type || 'nightly' }}-cleanup
+  group: ci-${{github.actor}}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-cleanup
   cancel-in-progress: true
 
 jobs:

@@ -14,6 +14,19 @@ on:
         description: "New Version that'll be Deployed"
         required: true
         type: string
+
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
       monoglue-build:
         description: "Build Status for Monoglue"
         required: true
@@ -47,11 +60,11 @@ on:
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
   BASE_NAME: BlaziumEditor_v${{ inputs.new_version }}
 
 concurrency:
-  group: ci-${{github.actor}}-${{ github.event.client_payload.type || 'nightly' }}-editor-deploy
+  group: ci-${{github.actor}}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-editor-deploy
   cancel-in-progress: true
 
 jobs:
@@ -169,25 +182,25 @@ jobs:
         uses: ./.github/actions/cerebro-download-multi-build
         with:
           names: |
-            macos-editor-${{ github.event.client_payload.type || 'nightly' }}
+            macos-editor-${{ inputs.external_status }}
           run_id: ${{ inputs.runner_id }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
           folder: ${{ github.workspace }}/downloads
           version: ${{ inputs.new_version }}
           build_sha: ${{ inputs.build_sha }}
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
+          deploy_type: ${{ inputs.external_status }}
       
       - name: Uncompress Templates
         uses: ./.github/actions/multi-uncompress-tar-gz
         with:
           names: |
-            macos-editor-${{ github.event.client_payload.type || 'nightly' }}
+            macos-editor-${{ inputs.external_status }}
           input_dir: ${{ github.workspace }}/downloads
           output_dir: ${{ github.workspace }}/extracted
 
       - name: Extract Blazium.
-        working-directory: extracted/macos-editor-${{ github.event.client_payload.type || 'nightly' }}
+        working-directory: extracted/macos-editor-${{ inputs.external_status }}
         run: |
           ls
           unzip -o Blazium_macos.universal.zip

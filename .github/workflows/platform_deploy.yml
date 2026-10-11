@@ -14,6 +14,19 @@ on:
         description: "New Version that'll be Deployed"
         required: true
         type: string
+
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
       monoglue-build:
         description: "Build Status for Monoglue"
         required: true
@@ -47,11 +60,11 @@ on:
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
   BASE_NAME: BlaziumEditor_v${{ inputs.new_version }}
 
 concurrency:
-  group: ci-${{github.actor}}-${{ github.event.client_payload.type || 'nightly' }}-editor-deploy
+  group: ci-${{github.actor}}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-editor-deploy
   cancel-in-progress: true
 
 jobs:
@@ -144,7 +157,7 @@ jobs:
           exit 1
   
   web-deploy:
-    name: Deploying Web Editor to ${{ github.event.client_payload.type || 'nightly' }}
+    name: Deploying Web Editor to ${{ inputs.external_status }}
     needs: do-we-deploy-lol
     if: >
       (needs.do-we-deploy-lol.outputs.proceed == 'true' ||
@@ -177,7 +190,7 @@ jobs:
           mkdir -p cicd/storage
           
           # Download the .tar.gz package instead of .zip
-          curl -L "${{ env.CDN_URL }}${{ env.DEPLOY_TYPE }}/${{ github.event.client_payload.type || 'nightly' }}/${{ env.DEPLOY_TYPE }}-${{ github.event.client_payload.type || 'nightly' }}.tar.gz" -o cicd/storage/web-editor.tar.gz
+          curl -L "${{ env.CDN_URL }}${{ env.DEPLOY_TYPE }}/${{ inputs.engine_reference }}/${{ inputs.external_status }}/${{ env.DEPLOY_TYPE }}-${{ inputs.external_status }}.tar.gz" -o cicd/storage/web-editor.tar.gz
 
           # Extract the main .tar.gz file
           tar -xzf cicd/storage/web-editor.tar.gz -C cicd/storage
@@ -196,13 +209,13 @@ jobs:
           context: ./cicd/web-editor
           push: true
           tags: |
-            ${{ secrets.DOCKER_ORG_USERNAME }}/${{ env.APP_NAME_BASE }}-${{ github.event.client_payload.type || 'nightly' }}:latest
-            ${{ secrets.DOCKER_ORG_USERNAME }}/${{ env.APP_NAME_BASE }}-${{ github.event.client_payload.type || 'nightly' }}:${{ inputs.new_version }}
+            ${{ secrets.DOCKER_ORG_USERNAME }}/${{ env.APP_NAME_BASE }}-${{ inputs.engine_reference }}-${{ inputs.external_status }}:latest
+            ${{ secrets.DOCKER_ORG_USERNAME }}/${{ env.APP_NAME_BASE }}-${{ inputs.engine_reference }}-${{ inputs.external_status }}:${{ inputs.new_version }}
 
       - name: Notify Cerebro to Deploy Web Build
         uses: ./.github/actions/cerebro-deploy
         with:
           name: web-editor
-          type: ${{ github.event.client_payload.type || 'nightly' }}
+          type: ${{ inputs.external_status }}
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}

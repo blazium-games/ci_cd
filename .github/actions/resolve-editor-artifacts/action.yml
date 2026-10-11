@@ -190,6 +190,7 @@ runs:
         done
         write_list github_files "${UPLOAD[@]+"${UPLOAD[@]}"}"
         UPLOAD+=("${EDITORS_DIR}/editors.json")
+        UPLOAD+=("${EDITORS_DIR}/line.json")
         write_list upload_files "${UPLOAD[@]+"${UPLOAD[@]}"}"
         write_list itch_files "${ITCH_FILES[@]+"${ITCH_FILES[@]}"}"
 

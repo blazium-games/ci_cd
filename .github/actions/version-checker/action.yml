@@ -8,6 +8,9 @@ inputs:
   deploy_type:
     description: Folder name representing placement on CDN
     required: true
+  engine_reference:
+    description: Engine line reference (blazium-dev or blazium_4.8)
+    required: true
   build_type:
     description: Nightly, etc.
     required: true
@@ -32,9 +35,9 @@ runs:
       run: |
           # Determine the URL based on whether this is a template
           if [ "${{ inputs.is_template }}" = "true" ]; then
-            URL="${{ inputs.base_url }}/${{ inputs.deploy_type }}/${{ inputs.build_type }}/template/build.sha"
+            URL="${{ inputs.base_url }}/${{ inputs.deploy_type }}/${{ inputs.engine_reference }}/${{ inputs.build_type }}/template/build.sha"
           else
-            URL="${{ inputs.base_url }}/${{ inputs.deploy_type }}/${{ inputs.build_type }}/build.sha"
+            URL="${{ inputs.base_url }}/${{ inputs.deploy_type }}/${{ inputs.engine_reference }}/${{ inputs.build_type }}/build.sha"
           fi
 
           # Check if the file exists on the server

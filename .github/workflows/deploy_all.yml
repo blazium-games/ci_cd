@@ -56,12 +56,25 @@ on:
         required: true
         type: string
 
+      external_status:
+        description: "Deploy channel stamped into the build (release, prerelease, nightly)"
+        required: true
+        type: string
+      engine_reference:
+        description: "Engine line reference (blazium-dev or blazium_4.8)"
+        required: true
+        type: string
+      godot_line:
+        description: "Godot line (4.3 or 4.8)"
+        required: true
+        type: string
+
 env:
   BASE_NAME: Blazium_v
-  GODOT_BASE_BRANCH: blazium-dev
+  GODOT_BASE_BRANCH: ${{ github.event.client_payload.branch || 'blazium-dev' }}
 
 concurrency:
-  group: ci-${{ github.actor }}-${{ github.event.client_payload.type || 'nightly' }}-deploy-all
+  group: ci-${{ github.actor }}-${{ inputs.engine_reference }}-${{ inputs.external_status }}-deploy-all
   cancel-in-progress: true
 
 jobs:
@@ -106,7 +119,7 @@ jobs:
           MAJOR_VERSION: ${{ inputs.new_major }}
           MINOR_VERSION: ${{ inputs.new_minor }}
           PATCH_VERSION: ${{ inputs.new_patch }}
-          BUILD_TYPE: ${{ github.event.client_payload.type || 'nightly' }}
+          BUILD_TYPE: ${{ inputs.external_status }}
           # Do not re-bump: inputs.new_* already came from runner.yml changelog pass (issue #716).
           FREEZE_VERSION: "1"
         run: |
@@ -141,7 +154,7 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: cicd/scripts/changelog.html
-          out_dir: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          out_dir: ${{ inputs.external_status }}/${{ inputs.new_version }}
 
       - uses: BetaHuhn/do-spaces-action@v2
         with:
@@ -150,7 +163,7 @@ jobs:
           space_name: ${{ secrets.DO_SPACE_NAME }}
           space_region: ${{ secrets.DO_SPACE_REGION }}
           source: cicd/scripts/changelog.txt
-          out_dir: ${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}
+          out_dir: ${{ inputs.external_status }}/${{ inputs.new_version }}
 
       - name: Create GitHub Release
         continue-on-error: ${{ github.event.client_payload.run_id != '' }}
@@ -161,11 +174,11 @@ jobs:
           OWNER: blazium-games
           REPO: blazium
           TARGET_COMMIT: ${{ inputs.build_sha }}
-          TAG_NAME: v${{ inputs.new_version }}${{ github.event.client_payload.type != 'release' && format('-{0}', github.event.client_payload.type || 'nightly') || '' }} 
-          NAME: "[${{ github.event.client_payload.type || 'nightly' }}] Blazium Engine v${{ inputs.new_version }}"
+          TAG_NAME: v${{ inputs.new_version }}${{ inputs.external_status != 'release' && format('-{0}', inputs.external_status) || '' }} 
+          NAME: "[${{ inputs.external_status }}] Blazium Engine v${{ inputs.new_version }}"
           BODY_FILE: ${{ github.workspace }}/cicd/scripts/changelog_short.html
           DRAFT: false
-          PRERELEASE: ${{ github.event.client_payload.type == 'nightly' || github.event.client_payload.type == 'prerelease' }}
+          PRERELEASE: ${{ inputs.external_status == 'nightly' || inputs.external_status == 'prerelease' }}
           DEBUG: true
 
   template-deploy:
@@ -178,6 +191,9 @@ jobs:
       build_sha: ${{ inputs.build_sha }}
       runner_id: ${{ inputs.runner_id }}
       new_version: ${{ inputs.new_version }}
+      external_status: ${{ inputs.external_status }}
+      engine_reference: ${{ inputs.engine_reference }}
+      godot_line: ${{ inputs.godot_line }}
       monoglue-build: ${{ inputs.monoglue-build }}
       windows-build: ${{ inputs.windows-build }}
       macos-build: ${{ inputs.macos-build }}
@@ -198,6 +214,9 @@ jobs:
       build_sha: ${{ inputs.build_sha }}
       runner_id: ${{ inputs.runner_id }}
       new_version: ${{ inputs.new_version }}
+      external_status: ${{ inputs.external_status }}
+      engine_reference: ${{ inputs.engine_reference }}
+      godot_line: ${{ inputs.godot_line }}
       monoglue-build: ${{ inputs.monoglue-build }}
       windows-build: ${{ inputs.windows-build }}
       macos-build: ${{ inputs.macos-build }}
@@ -236,10 +255,10 @@ jobs:
         uses: ./.github/actions/cerebro-update-version
         with:
           version: ${{ inputs.new_version }}
-          changelog_url: ${{ secrets.CDN_URL }}/${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}/changelog.txt
-          deploy_type: ${{ github.event.client_payload.type || 'nightly' }}
-          templates_url: ${{ secrets.CDN_URL }}/${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}/details.json
-          version_url: ${{ secrets.CDN_URL }}/${{ github.event.client_payload.type || 'nightly' }}/${{ inputs.new_version }}/editors.json
+          changelog_url: ${{ secrets.CDN_URL }}/${{ inputs.external_status }}/${{ inputs.new_version }}/changelog.txt
+          deploy_type: ${{ inputs.external_status }}
+          templates_url: ${{ secrets.CDN_URL }}/${{ inputs.external_status }}/${{ inputs.new_version }}/details.json
+          version_url: ${{ secrets.CDN_URL }}/${{ inputs.external_status }}/${{ inputs.new_version }}/editors.json
           cerebro_url: ${{ secrets.CEREBRO_URL }}
           cerebro_auth: ${{ secrets.BLAZIUM_AUTH }}
 
@@ -254,6 +273,9 @@ jobs:
       build_sha: ${{ inputs.build_sha }}
       runner_id: ${{ inputs.runner_id }}
       new_version: ${{ inputs.new_version }}
+      external_status: ${{ inputs.external_status }}
+      engine_reference: ${{ inputs.engine_reference }}
+      godot_line: ${{ inputs.godot_line }}
       monoglue-build: ${{ inputs.monoglue-build }}
       windows-build: ${{ inputs.windows-build }}
       macos-build: ${{ inputs.macos-build }}
@@ -275,6 +297,9 @@ jobs:
       build_sha: ${{ inputs.build_sha }}
       runner_id: ${{ inputs.runner_id }}
       new_version: ${{ inputs.new_version }}
+      external_status: ${{ inputs.external_status }}
+      engine_reference: ${{ inputs.engine_reference }}
+      godot_line: ${{ inputs.godot_line }}
       monoglue-build: ${{ inputs.monoglue-build }}
       windows-build: ${{ inputs.windows-build }}
       macos-build: ${{ inputs.macos-build }}
