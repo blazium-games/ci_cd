@@ -18,8 +18,10 @@ if command -v 7z >/dev/null 2>&1; then
   SEVENZ="7z"
 elif command -v 7za >/dev/null 2>&1; then
   SEVENZ="7za"
+elif command -v 7zz >/dev/null 2>&1; then
+  SEVENZ="7zz"
 else
-  echo "Error: 7z/7za not found on PATH. Install p7zip-full (Linux) or sevenzip (macOS/Homebrew)." >&2
+  echo "Error: 7z/7za/7zz not found on PATH. Install p7zip-full (Linux) or sevenzip (macOS/Homebrew)." >&2
   exit 1
 fi
 

@@ -66,7 +66,7 @@ jobs:
     steps:
 
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/ci_cd
           
@@ -91,7 +91,7 @@ jobs:
     steps:
 
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/ci_cd
           
@@ -126,7 +126,7 @@ jobs:
     steps:
       - name: Checkout CI actions
         if: ${{ !matrix.skip }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/ci_cd
           fetch-depth: 1
@@ -146,7 +146,7 @@ jobs:
 
       - name: Checkout Repository
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/blazium
           ref: ${{ inputs.build_sha }}
@@ -196,11 +196,11 @@ jobs:
 
       - name: Set up Emscripten latest
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: ${{env.EM_VERSION}}
           actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
-          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref_name}}-${{github.sha}}
 
       - name: Verify Emscripten setup
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -216,9 +216,7 @@ jobs:
 
       - name: Install p7zip for web template ZIP compression
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y p7zip-full
+        run: bash .github/scripts/install_7z.sh
 
       - name: Setup Python and SCons
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -295,7 +293,7 @@ jobs:
     steps:
       - name: Checkout CI actions
         if: ${{ !matrix.skip }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/ci_cd
           fetch-depth: 1
@@ -315,7 +313,7 @@ jobs:
 
       - name: Checkout Repository
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/blazium
           ref: ${{ inputs.build_sha }}
@@ -365,11 +363,11 @@ jobs:
 
       - name: Set up Emscripten latest
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: ${{env.EM_VERSION}}
           actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
-          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref_name}}-${{github.sha}}
 
       - name: Verify Emscripten setup
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -385,9 +383,7 @@ jobs:
 
       - name: Install p7zip for web template ZIP compression
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y p7zip-full
+        run: bash .github/scripts/install_7z.sh
 
       - name: Setup Python and SCons
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -537,7 +533,7 @@ jobs:
     steps:
       - name: Checkout CI actions
         if: ${{ !matrix.skip }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/ci_cd
           fetch-depth: 1
@@ -557,7 +553,7 @@ jobs:
 
       - name: Checkout Repository
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/blazium
           ref: ${{ inputs.build_sha }}
@@ -607,11 +603,11 @@ jobs:
 
       - name: Set up Emscripten latest
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: ${{env.EM_VERSION}}
           actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
-          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref_name}}-${{github.sha}}
 
       - name: Verify Emscripten setup
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -627,9 +623,7 @@ jobs:
 
       - name: Install p7zip for web template ZIP compression
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y p7zip-full
+        run: bash .github/scripts/install_7z.sh
 
       - name: Setup Python and SCons
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -742,7 +736,7 @@ jobs:
     steps:
       - name: Checkout CI actions
         if: ${{ !matrix.skip }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/ci_cd
           fetch-depth: 1
@@ -762,7 +756,7 @@ jobs:
 
       - name: Checkout Repository
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: blazium-games/blazium
           ref: ${{ inputs.build_sha }}
@@ -812,11 +806,11 @@ jobs:
 
       - name: Set up Emscripten latest
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: ${{env.EM_VERSION}}
           actions-cache-folder: ${{env.EM_CACHE_FOLDER}}
-          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref}}-${{github.sha}}
+          cache-key: emsdk-${{ matrix.cache-name }}-${{env.GODOT_BASE_BRANCH}}-${{github.ref_name}}-${{github.sha}}
 
       - name: Verify Emscripten setup
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
@@ -832,9 +826,7 @@ jobs:
 
       - name: Install p7zip for web template ZIP compression
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y p7zip-full
+        run: bash .github/scripts/install_7z.sh
 
       - name: Setup Python and SCons
         if: ${{ steps.reuse.outputs.should_compile != 'false' }}
